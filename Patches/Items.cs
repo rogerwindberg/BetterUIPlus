@@ -9,6 +9,24 @@ using UnityEngine.UI;
 
 namespace BetterUI.Patches
 {
+    public static class ElementHelper
+    {
+        public static void UpdateElement(GuiBar durabilityBar, Image icon, ItemDrop.ItemData item)
+        {
+            if (Main.durabilityBarColorPalette.Value != Main.DurabilityBarStyle.Disabled && item.m_shared.m_useDurability)
+            {
+                if (item.m_durability <= 0f)
+                {
+                    // Item has no durability, original code will handle this
+                }
+                else // Item has durability left
+                {
+                    DurabilityBar.UpdateColor(durabilityBar, item.GetDurabilityPercentage());
+                }
+            }
+        }
+    }
+
   static class DurabilityBar
   {
     private static readonly Color[] normal = new Color[]
@@ -32,58 +50,31 @@ namespace BetterUI.Patches
       protanopia
     };
 
-    private static readonly Color[] activeColor = colorArray[Main.durabilityColorPalette.Value] as Color[];
+    private static readonly Color[] activeColor = colorArray[(int)Main.durabilityBarColorPalette.Value] as Color[];
 
-    public static void UpdateColor(InventoryGrid.Element element, float durability)
+    public static void UpdateColor(GuiBar durabilityBar, float durability)
     {
-      element.m_durability.SetValue(durability);
+      durabilityBar.SetValue(durability);
       // Might be to update items colorbar? This is from original code.
-      element.m_durability.ResetColor();
+      durabilityBar.ResetColor();
       // Between 1f - 0f
       switch (durability)
       {
         case float n when (n >= 0.75f):
           // Color green
-          element.m_durability.SetColor(activeColor[0]);
+          durabilityBar.SetColor(activeColor[0]);
           break;
         case float n when (n >= 0.50f):
           // Color yellow
-          element.m_durability.SetColor(activeColor[1]);
+          durabilityBar.SetColor(activeColor[1]);
           break;
         case float n when (n >= 0.25f):
           // Color Orange
-          element.m_durability.SetColor(activeColor[2]);
+          durabilityBar.SetColor(activeColor[2]);
           break;
         case float n when (n >= 0f):
           // Color Red
-          element.m_durability.SetColor(activeColor[3]);
-          break;
-      }
-    }
-
-    public static void UpdateColor(HotkeyBar.ElementData element, float durability)
-    {
-      element.m_durability.SetValue(durability);
-      // Might be to update items colorbar? This is from original code.
-      element.m_durability.ResetColor();
-      // Between 1f - 0f
-      switch (durability)
-      {
-        case float n when (n >= 0.75f):
-          // Color green
-          element.m_durability.SetColor(activeColor[0]);
-          break;
-        case float n when (n >= 0.50f):
-          // Color yellow
-          element.m_durability.SetColor(activeColor[1]);
-          break;
-        case float n when (n >= 0.25f):
-          // Color Orange
-          element.m_durability.SetColor(activeColor[2]);
-          break;
-        case float n when (n >= 0f):
-          // Color Red
-          element.m_durability.SetColor(activeColor[3]);
+          durabilityBar.SetColor(activeColor[3]);
           break;
       }
     }
@@ -91,7 +82,7 @@ namespace BetterUI.Patches
 
   static class Stars
   {
-    private static Color starColor = new Color(1.0f, 0.85882f, 0.23137f, 1.0f);
+    private static Color starColor = new(1.0f, 0.85882f, 0.23137f, 1.0f);
 
     public static void Draw(InventoryGrid.Element element, int quality_lvl)
     {
@@ -115,7 +106,7 @@ namespace BetterUI.Patches
       // Parent size = 64x64, quality size = 20x20, top-right (0,0) -> (-4f,-10f)
       element.m_quality.rectTransform.anchoredPosition = new Vector2(-4f, -6f);
 
-      // TODO: Spawned items might brake this, as they could have 99 stars. 
+      // TODO: Spawned items might break this, as they could have 99 stars. 
       // Possible fix, after x amount switch to: ★x[amount] = ★x99
     }
     public static string HoverText(int quality_lvl)
@@ -160,6 +151,7 @@ namespace BetterUI.Patches
       InventoryElement.transform.Find("quality").GetComponent<Text>().enabled = false;
       InventoryElement.transform.Find("selected").gameObject.SetActive(false);
       InventoryElement.transform.Find("noteleport").GetComponent<Image>().enabled = false;
+      InventoryElement.transform.Find("foodicon").GetComponent<Image>().enabled = false;
 
       // Delete components
       UnityEngine.Object.Destroy(InventoryElement.GetComponent<UIInputHandler>());
@@ -181,13 +173,13 @@ namespace BetterUI.Patches
       background.GetComponent<Image>().enabled = false;
 
       UITooltip bkgTooltip = InventoryElement.GetComponent<UITooltip>();
-      bkgTooltip.m_topic = $"Lv.{XP.level} {Player.m_localPlayer.GetPlayerName()}";
+      bkgTooltip.m_topic = $"{DisplayXpLevel()}{Player.m_localPlayer.GetPlayerName()}";
 
       tooltip = bkgTooltip;
-      //m_armor = text.GetComponent<Text>();
       m_armor = ig.m_armor;
     }
-  
+
+
     public static void Update(Player player)
     {
       // Update UI info
@@ -201,7 +193,7 @@ namespace BetterUI.Patches
       sb.Append("\n" + new string('\u2500', 10) + "  Buffs  " + new string('\u2500', 10));
       if (player.m_equipmentMovementModifier != 0f)
       {
-        string color = player.m_equipmentMovementModifier > 0 ? "green" : "red";
+        string color = player.m_equipmentMovementModifier >= 0 ? "green" : "red";
         sb.AppendFormat("\nMovement: <color={0}>{1}%</color>", color, player.m_equipmentMovementModifier * 100f);
       }
 
@@ -218,9 +210,14 @@ namespace BetterUI.Patches
       sb.Append("\n");
 
       tooltip.m_text = sb.ToString();
-      tooltip.m_topic = $"Lv.{XP.level} {player.GetPlayerName()}";
+      tooltip.m_topic = $"{DisplayXpLevel()}{player.GetPlayerName()}";
     }
- 
+
+    private static string DisplayXpLevel()
+    {
+      return Main.showCharacterXP.Value ? $"Lv.{XP.level} " : string.Empty;
+    }
+
     private static void BlockStats(Player player, StringBuilder sb)
     {
       ItemDrop.ItemData cb = player.GetCurrentBlocker();
@@ -280,10 +277,10 @@ namespace BetterUI.Patches
     {
       if (left)
       {
-        return player.m_leftItem != null ? player.m_leftItem : player.m_hiddenLeftItem; 
+        return player.m_leftItem ?? player.m_hiddenLeftItem; 
       } else
       {
-        return player.m_rightItem != null ? player.m_rightItem : player.m_hiddenRightItem;
+        return player.m_rightItem ?? player.m_hiddenRightItem;
       }
 
     }
@@ -420,7 +417,7 @@ namespace BetterUI.Patches
       }
     }
 
-    private static void ItemType(int qualityLevel)
+    private static void ItemType(int qualityLevel, float skillLevel)
     {
       switch (_item.m_shared.m_itemType)
       {
@@ -428,12 +425,15 @@ namespace BetterUI.Patches
           {
             if (_item.m_shared.m_food > 0f)
             {
-              _sb.AppendFormat("\n$item_food_health: <color=orange>{0}</color>", _item.m_shared.m_food);
-              _sb.AppendFormat("\n$item_food_stamina: <color=orange>{0}</color>", _item.m_shared.m_foodStamina);
-              _sb.AppendFormat("\n$item_food_duration: <color=orange>{0}s</color>", _item.m_shared.m_foodBurnTime);
+              _sb.AppendFormat("\n$item_food_health: <color=red>{0}</color>", _item.m_shared.m_food);
+              _sb.AppendFormat("\n$item_food_stamina: <color=yellow>{0}</color>", _item.m_shared.m_foodStamina);
+              if (_item.m_shared.m_foodEitr > 0f) {
+                _sb.AppendFormat("\n$item_food_eitr: <color=cyan>{0}</color>", _item.m_shared.m_foodEitr);
+              }
+              _sb.AppendFormat("\n$item_food_duration: <color=orange>{0}s ({1}m)</color>", _item.m_shared.m_foodBurnTime, (_item.m_shared.m_foodBurnTime/60));
               _sb.AppendFormat("\n$item_food_regen: <color=orange>{0} hp/tick</color>", _item.m_shared.m_foodRegen);
             }
-            string statusEffectTooltip = _item.GetStatusEffectTooltip();
+            string statusEffectTooltip = _item.GetStatusEffectTooltip(qualityLevel, skillLevel);
             if (statusEffectTooltip.Length > 0)
             {
               _sb.Append("\n\n");
@@ -462,7 +462,7 @@ namespace BetterUI.Patches
               _sb.Append("\n\n");
               _sb.Append(projectileTooltip);
             }
-            string statusEffectTooltip2 = _item.GetStatusEffectTooltip();
+            string statusEffectTooltip2 = _item.GetStatusEffectTooltip(qualityLevel, skillLevel);
             if (statusEffectTooltip2.Length > 0)
             {
               _sb.Append("\n\n");
@@ -493,7 +493,7 @@ namespace BetterUI.Patches
               _sb.Append(damageModifiersTooltipString);
             }
             */
-            string statusEffectTooltip3 = _item.GetStatusEffectTooltip();
+            string statusEffectTooltip3 = _item.GetStatusEffectTooltip(qualityLevel, skillLevel);
             if (statusEffectTooltip3.Length > 0)
             {
               _sb.Append("\n\n");
@@ -508,10 +508,9 @@ namespace BetterUI.Patches
       }
     }
 
-    private static void Movement(Player localPlayer)
+    private static void Movement()
     {
-      //float equipmentMovementModifier = localPlayer.GetEquipmentMovementModifier();
-      string color = localPlayer.m_equipmentMovementModifier > 0 ? "green" : "red";
+      string color = _item.m_shared.m_movementModifier >= 0 ? "green" : "red";
       _sb.AppendFormat("\n$item_movement_modifier: <color={0}>{1}%</color>", color, (_item.m_shared.m_movementModifier * 100f).ToString("+0;-0"));
     }
 
@@ -555,7 +554,7 @@ namespace BetterUI.Patches
       _sb.Append("\n<color=red>$item_noteleport</color>");
     }
 
-    private static void UpgradeStats()
+    private static void UpgradeStats(Player localPlayer)
     {
       int newQuality = _quality;
       int oldQuality = _quality - 1;
@@ -603,7 +602,7 @@ namespace BetterUI.Patches
               _sb.Append("\n\n");
               _sb.Append(projectileTooltip);
             }
-            string statusEffectTooltip2 = _item.GetStatusEffectTooltip();
+            string statusEffectTooltip2 = _item.GetStatusEffectTooltip(newQuality, localPlayer.GetSkillLevel(_item.m_shared.m_skillType));
             if (statusEffectTooltip2.Length > 0)
             {
               _sb.Append("\n\n");
@@ -652,7 +651,7 @@ namespace BetterUI.Patches
               _sb.Append(damageModifiersTooltipString);
             }
             */
-            string statusEffectTooltip3 = _item.GetStatusEffectTooltip();
+            string statusEffectTooltip3 = _item.GetStatusEffectTooltip(newQuality, localPlayer.GetSkillLevel(_item.m_shared.m_skillType));
             if (statusEffectTooltip3.Length > 0)
             {
               _sb.Append("\n\n");
@@ -738,7 +737,7 @@ namespace BetterUI.Patches
       if (!_item.m_shared.m_teleportable) Teleport();
       if (_item.m_shared.m_value > 0) Value();
 
-      ItemType(_quality);
+      ItemType(_quality, localPlayer.m_skills.GetSkillLevel(_item.m_shared.m_skillType));
 
       if (_item.m_shared.m_useDurability)
       {
@@ -749,11 +748,11 @@ namespace BetterUI.Patches
         _sb.Append("\n");
       }
 
-      if (_item.m_shared.m_movementModifier != 0f && localPlayer != null) Movement(localPlayer);
+      if (_item.m_shared.m_movementModifier != 0f) Movement();
 
       DamageModifiers();
 
-      string setStatusEffectTooltip = _item.GetSetStatusEffectTooltip();
+      string setStatusEffectTooltip = _item.GetSetStatusEffectTooltip(_quality, localPlayer.GetSkillLevel(_item.m_shared.m_skillType));
       if (setStatusEffectTooltip.Length > 0) StatusEffect(setStatusEffectTooltip);
     }
 
@@ -775,7 +774,7 @@ namespace BetterUI.Patches
         if (_item.m_shared.m_value > 0) Value();
 
         // Your fantastic logic to parse stats.
-        UpgradeStats();
+        UpgradeStats(localPlayer);
 
         if (_item.m_shared.m_useDurability)
         {
@@ -784,11 +783,11 @@ namespace BetterUI.Patches
           _sb.Append("\n");
         }
 
-        if (_item.m_shared.m_movementModifier != 0f && localPlayer != null) Movement(localPlayer);
+        if (_item.m_shared.m_movementModifier != 0f) Movement();
 
         DamageModifiers();
 
-        string setStatusEffectTooltip = _item.GetSetStatusEffectTooltip();
+        string setStatusEffectTooltip = _item.GetSetStatusEffectTooltip(_quality, localPlayer.GetSkillLevel(_item.m_shared.m_skillType));
         if (setStatusEffectTooltip.Length > 0) StatusEffect(setStatusEffectTooltip);
       }
 
